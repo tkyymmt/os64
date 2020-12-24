@@ -145,9 +145,15 @@ void load_kernel(struct EFI_SYSTEM_TABLE *ST)
 	ST->BootServices->SetMem(head.bss_start, head.bss_size, 0);
 }
 
+
+/* I don't know, but if you put mem_desc variable into exit_boot_services, 
+ * you get error message saying "undefined reference to `___chkstk_ms'".
+ * I guess it is too big to fit in the function as local variable.
+ * */
+unsigned char mem_desc[MEM_DESC_SIZE];
+
 void exit_boot_services(void *IH, struct EFI_SYSTEM_TABLE *ST)
 {
-	unsigned char mem_desc[MEM_DESC_SIZE];
 	unsigned long long mem_desc_unit_size;
 	unsigned long long map_key;
     unsigned long long mmap_size;

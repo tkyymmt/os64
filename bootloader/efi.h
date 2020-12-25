@@ -292,6 +292,29 @@ struct EFI_FILE_INFO {
 	unsigned short FileName[];
 };
 
+struct EFI_GRAPHICS_OUTPUT_PROTOCOL {
+	unsigned long long _buf[3];
+	struct EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE {
+		unsigned int MaxMode;
+		unsigned int Mode;
+		struct EFI_GRAPHICS_OUTPUT_MODE_INFORMATION {
+			unsigned int Version;
+			unsigned int HorizontalResolution;
+			unsigned int VerticalResolution;
+			enum EFI_GRAPHICS_PIXEL_FORMAT {
+				PixelRedGreenBlueReserved8BitPerColor,
+				PixelBlueGreenRedReserved8BitPerColor,
+				PixelBitMask,
+				PixelBltOnly,
+				PixelFormatMax
+			} PixelFormat;
+		} *Info;
+		unsigned long long SizeOfInfo;
+		unsigned long long FrameBufferBase;
+		unsigned long long FrameBufferSize;
+	} *Mode;
+};
+
 struct EFI_GRAPHICS_OUTPUT_PROTOCOL *GOP;
 struct EFI_SIMPLE_POINTER_PROTOCOL *SPP;
 struct EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *STIEP;
@@ -299,7 +322,6 @@ struct EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *DPTTP;
 struct EFI_DEVICE_PATH_FROM_TEXT_PROTOCOL *DPFTP;
 struct EFI_DEVICE_PATH_UTILITIES_PROTOCOL *DPUP;
 struct EFI_MP_SERVICES_PROTOCOL *MSP;
-
 
 
 

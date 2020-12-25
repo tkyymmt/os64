@@ -1,10 +1,12 @@
 #include "efi.h"
+#include "fb.h"
 
 
 #define NULL				(void *)0
 
 #define KERNEL_FILE_NAME	"kernel.bin"
 #define KERNEL_START		0x0000000000110000
+#define KERNEL_STACK_BASE	0x0000000000210000
 
 #define MEM_DESC_SIZE		4800
 
@@ -62,35 +64,6 @@ void efi_init(struct EFI_SYSTEM_TABLE *ST)
 	ST->BootServices->LocateProtocol(&msp_guid, NULL, (void **)&MSP);
 }
 
-struct EFI_FILE_PROTOCOL *search_volume_contains_file(
-	unsigned short *target_filename, struct EFI_SYSTEM_TABLE *ST)
-{
-	void **sfs_handles;
-	unsigned long long sfs_handles_num = 0;
-	ST->BootServices->LocateHandleBuffer(
-		ByProtocol, &sfsp_guid, NULL, &sfs_handles_num,
-		(void ***)&sfs_handles);
-
-	unsigned char i;
-	struct EFI_FILE_PROTOCOL *fp;
-	for (i = 0; i < sfs_handles_num; i++) {
-		struct EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *tmp_sfsp;
-		 ST->BootServices->HandleProtocol(
-			sfs_handles[i], &sfsp_guid, (void **)&tmp_sfsp);
-
-		tmp_sfsp->OpenVolume(tmp_sfsp, &fp);
-
-		struct EFI_FILE_PROTOCOL *_target_fp;
-		fp->Open(
-			fp, &_target_fp, target_filename,
-			EFI_FILE_MODE_READ, 0);
-
-		return fp;
-	}
-
-	return NULL;
-}
-
 unsigned long long get_file_size(struct EFI_FILE_PROTOCOL *file)
 {
 	unsigned long long fi_size = FILE_INFO_BUF_SIZE;
@@ -105,7 +78,7 @@ unsigned long long get_file_size(struct EFI_FILE_PROTOCOL *file)
 }
 
 void safety_file_read(struct EFI_FILE_PROTOCOL *src, void *dst,
-		      unsigned long long size)
+					  unsigned long long size)
 {
 	unsigned char *d = dst;
 	while (size > SAFETY_READ_UNIT) {
@@ -122,14 +95,106 @@ void safety_file_read(struct EFI_FILE_PROTOCOL *src, void *dst,
 	}
 }
 
+
+
+struct EFI_SYSTEM_TABLE *ST;
+void puts(unsigned short *s)
+{
+	ST->ConOut->OutputString(ST->ConOut, s);
+}
+#define MAX_STR_BUF	100
+void puth(unsigned long long val, unsigned char num_digits)
+{
+	int i;
+	unsigned short unicode_val;
+	unsigned short str[MAX_STR_BUF];
+
+	for (i = num_digits - 1; i >= 0; i--) {
+		unicode_val = (unsigned short)(val & 0x0f);
+		if (unicode_val < 0xa)
+			str[i] = L'0' + unicode_val;
+		else
+			str[i] = L'A' + (unicode_val - 0xa);
+		val >>= 4;
+	}
+	str[num_digits] = L'\0';
+
+	puts(str);
+}
+void put_param(unsigned short *name, unsigned long long val)
+{
+	puts(name);
+	puts(L": 0x");
+	puth(val, 16);
+	puts(L"\r\n");
+}
+unsigned char check_warn_error(unsigned long long status, unsigned short *message)
+{
+	if (status) {
+		puts(message);
+		puts(L":");
+		puth(status, 16);
+		puts(L"\r\n");
+	}
+
+	return !status;
+}
+void assert(unsigned long long status, unsigned short *message)
+{
+	if (!check_warn_error(status, message))
+		while (1);
+}
+struct EFI_FILE_PROTOCOL *search_volume_contains_file(
+	unsigned short *target_filename)
+{
+	void **sfs_handles;
+	unsigned long long sfs_handles_num = 0;
+	unsigned long long status;
+	status = ST->BootServices->LocateHandleBuffer(
+		ByProtocol, &sfsp_guid, NULL, &sfs_handles_num,
+		(void ***)&sfs_handles);
+	assert(status, L"LocateHandleBuffer");
+
+	put_param(L"Number of volumes", sfs_handles_num);
+
+	unsigned char i;
+	struct EFI_FILE_PROTOCOL *fp;
+	for (i = 0; i < sfs_handles_num; i++) {
+		struct EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *tmp_sfsp;
+		status = ST->BootServices->HandleProtocol(
+			sfs_handles[i], &sfsp_guid, (void **)&tmp_sfsp);
+		if (!check_warn_error(status, L"HandleProtocol(sfs_handles)"))
+			continue;
+
+		status = tmp_sfsp->OpenVolume(tmp_sfsp, &fp);
+		if (!check_warn_error(status, L"OpenVolume(tmp_sfsp)"))
+			continue;
+
+		struct EFI_FILE_PROTOCOL *_target_fp;
+		status = fp->Open(
+			fp, &_target_fp, target_filename,
+			EFI_FILE_MODE_READ, 0);
+		if (!check_warn_error(
+			    status, L"This volume don't have target file."))
+			continue;
+
+		return fp;
+	}
+
+	return NULL;
+}
 void load_kernel(struct EFI_SYSTEM_TABLE *ST)
 {
-	struct EFI_FILE_PROTOCOL *root = search_volume_contains_file(KERNEL_FILE_NAME, ST);
-	struct EFI_FILE_PROTOCOL *kernel_file;
-	
+	struct EFI_FILE_PROTOCOL *root;// = search_volume_contains_file(KERNEL_FILE_NAME);
+	struct EFI_FILE_PROTOCOL *kernel_file = NULL;
 	root->Open(root, &kernel_file, KERNEL_FILE_NAME, EFI_FILE_MODE_READ, 0);
+	if (kernel_file == NULL)
+		ST->ConOut->OutputString(ST->ConOut, L"----------------THEN-------------\n");
+	else
+		ST->ConOut->OutputString(ST->ConOut, L"-----------------ELSE--------------\n");
+	while(1);
 
-	unsigned long long kernel_size = get_file_size(kernel_file);
+	/*
 
 	struct header {
 		void *bss_start;
@@ -143,6 +208,7 @@ void load_kernel(struct EFI_SYSTEM_TABLE *ST)
 	kernel_file->Close(kernel_file);
 
 	ST->BootServices->SetMem(head.bss_start, head.bss_size, 0);
+	*/
 }
 
 
@@ -161,16 +227,26 @@ void exit_boot_services(void *IH, struct EFI_SYSTEM_TABLE *ST)
 
     mmap_size = MEM_DESC_SIZE;
     ST->BootServices->GetMemoryMap(&mmap_size,
-            (struct EFI_MEMORY_DESCRIPTOR *)mem_desc,
-            &map_key, &mem_desc_unit_size, &desc_ver);
+            (struct EFI_MEMORY_DESCRIPTOR *)mem_desc,            &map_key, &mem_desc_unit_size, &desc_ver);
     
     ST->BootServices->ExitBootServices(IH, map_key);
 }
 
+
+struct framebuffer fb;
+void init_fb()
+{
+	fb.base = GOP->Mode->FrameBufferBase;
+	fb.size = GOP->Mode->FrameBufferSize;
+	fb.hr = GOP->Mode->Info->HorizontalResolution;
+	fb.vr = GOP->Mode->Info->VerticalResolution;
+}
+
+
 void efi_main(void *ImageHandle, struct EFI_SYSTEM_TABLE  *SystemTable)
 {
     void *IH = ImageHandle;
-    struct EFI_SYSTEM_TABLE *ST = SystemTable;
+    ST = SystemTable;
 
 
 	ST->ConOut->ClearScreen(ST->ConOut);
@@ -179,11 +255,24 @@ void efi_main(void *ImageHandle, struct EFI_SYSTEM_TABLE  *SystemTable)
 	ST->ConOut->OutputString(ST->ConOut, L"Initializing the bootloader\n");
     efi_init(ST);
 
+	ST->ConOut->OutputString(ST->ConOut, L"Initializing the framebuffer\n");
+	init_fb();
+
 	ST->ConOut->OutputString(ST->ConOut, L"Loading the kernel\n");
-    //load_kernel(ST);
+    load_kernel(ST);
 
 	ST->ConOut->OutputString(ST->ConOut, L"Exiting the bootloader\n");
     exit_boot_services(IH, ST);
+
+
+	// jump to kernel code
+	unsigned long long kernel_arg_fb = (unsigned long long)&fb;
+	unsigned long long _sb = KERNEL_STACK_BASE;
+	unsigned long long _ks = KERNEL_START;
+	__asm__ (	"	mov	%0, %%rdx\n"
+				"	mov	%1, %%rsp\n"
+				"	jmp	*%2\n"
+				::"m"(kernel_arg_fb), "m"(_sb), "m"(_ks));
 
 
     while(1);

@@ -1,7 +1,9 @@
 run: b k
 	mkdir -p fs/EFI/BOOT
 	mv bootloader/BOOTX64.EFI fs/EFI/BOOT
-	mv kernel/kernel.bin fs
+	#mv kernel/kernel.bin fs
+	echo aaa > aaa
+	mv aaa fs
 	qemu-system-x86_64 -nographic -bios OVMF.fd -drive format=raw,file=fat:rw:fs -m 4G
 
 b:

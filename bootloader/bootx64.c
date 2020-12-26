@@ -62,19 +62,7 @@ void efi_init(struct EFI_SYSTEM_TABLE *ST)
 	ST->BootServices->LocateProtocol(&dpftp_guid, NULL, (void **)&DPFTP);
 	ST->BootServices->LocateProtocol(&dpup_guid, NULL, (void **)&DPUP);
 	ST->BootServices->LocateProtocol(&msp_guid, NULL, (void **)&MSP);
-}
-
-unsigned long long get_file_size(struct EFI_FILE_PROTOCOL *file)
-{
-	unsigned long long fi_size = FILE_INFO_BUF_SIZE;
-	unsigned long long fi_buf[FILE_INFO_BUF_SIZE];
-	struct EFI_FILE_INFO *fi_ptr;
-
-	file->GetInfo(file, &fi_guid, &fi_size, fi_buf);
-
-	fi_ptr = (struct EFI_FILE_INFO *)fi_buf;
-
-	return fi_ptr->FileSize;
+	ST->BootServices->LocateProtocol(&sfsp_guid, NULL, (void **)&SFSP);
 }
 
 void safety_file_read(struct EFI_FILE_PROTOCOL *src, void *dst,
@@ -94,7 +82,6 @@ void safety_file_read(struct EFI_FILE_PROTOCOL *src, void *dst,
 		size -= tmp_size;
 	}
 }
-
 
 
 struct EFI_SYSTEM_TABLE *ST;
@@ -185,7 +172,7 @@ struct EFI_FILE_PROTOCOL *search_volume_contains_file(
 }
 void load_kernel(struct EFI_SYSTEM_TABLE *ST)
 {
-	struct EFI_FILE_PROTOCOL *root;// = search_volume_contains_file(KERNEL_FILE_NAME);
+	struct EFI_FILE_PROTOCOL *root = search_volume_contains_file(KERNEL_FILE_NAME);
 	struct EFI_FILE_PROTOCOL *kernel_file = NULL;
 	root->Open(root, &kernel_file, KERNEL_FILE_NAME, EFI_FILE_MODE_READ, 0);
 	if (kernel_file == NULL)
@@ -243,6 +230,16 @@ void init_fb()
 }
 
 
+#define MAX_FILE_NAME_LEN  4
+#define MAX_FILE_NUM       10
+#define MAX_FILE_BUF       1024
+
+struct FILE {
+    unsigned short name[MAX_FILE_NAME_LEN];
+};
+
+extern struct FILE file_list[MAX_FILE_NUM];
+
 void efi_main(void *ImageHandle, struct EFI_SYSTEM_TABLE  *SystemTable)
 {
     void *IH = ImageHandle;
@@ -257,6 +254,51 @@ void efi_main(void *ImageHandle, struct EFI_SYSTEM_TABLE  *SystemTable)
 
 	ST->ConOut->OutputString(ST->ConOut, L"Initializing the framebuffer\n");
 	init_fb();
+
+
+
+	struct EFI_FILE_PROTOCOL *root;
+	struct EFI_FILE_PROTOCOL *kernel_file;
+	unsigned long long status;
+	unsigned long long buf_size = MAX_FILE_BUF;
+ 	unsigned char file_buf[MAX_FILE_BUF];
+
+	SFSP->OpenVolume(SFSP, &root);
+
+	status = root->Open(root, &kernel_file, "aaa", EFI_FILE_MODE_READ, 0);
+	if (status) {
+		ST->ConOut->OutputString(ST->ConOut, L"ERRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRor\n");
+		check_warn_error(status, L"kernel_file error");
+	}
+/*
+	struct header {
+		void *bss_start;
+		unsigned long long bss_size;
+	} head;
+
+	safety_file_read(kernel_file, (void *)&head, sizeof(head));
+
+	kernel_size -= sizeof(head);
+	safety_file_read(kernel_file, (void *)KERNEL_START, kernel_size);
+	kernel_file->Close(kernel_file);
+
+	ST->BootServices->SetMem(head.bss_start, head.bss_size, 0);
+
+	unsigned long long fib_size = FILE_INFO_BUF_SIZE;
+	unsigned long long fi_buf[FILE_INFO_BUF_SIZE];
+	struct EFI_FILE_INFO *fi_ptr;
+
+	kernel_file->GetInfo(file, &fi_guid, &fib_size, fi_buf);
+
+	fi_ptr = (struct EFI_FILE_INFO *)fi_buf;
+*/
+	// dunno why, closing the kernel_file causes exception
+	//kernel_file->Close(kernel_file);
+	root->Close(root);
+	while(1);
+
+
+
 
 	ST->ConOut->OutputString(ST->ConOut, L"Loading the kernel\n");
     load_kernel(ST);

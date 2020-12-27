@@ -140,6 +140,8 @@ void load_kernel(/*struct EFI_SYSTEM_TABLE *ST*/)
 	
 	kernel_file->Close(kernel_file);
 
+	// This causes a exception in other environment.
+	// my guess is due to the difference of the memory map of qemu
 	ST->BootServices->SetMem(head.bss_start, head.bss_size, 0);
 }
 

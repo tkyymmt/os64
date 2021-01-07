@@ -315,7 +315,48 @@ struct EFI_GRAPHICS_OUTPUT_PROTOCOL {
 	} *Mode;
 };
 
+struct EFI_MP_SERVICES_PROTOCOL {
+	unsigned long long (*GetNumberOfProcessors)(
+		struct EFI_MP_SERVICES_PROTOCOL *This,
+		unsigned long long *NumberOfProcessors,
+		unsigned long long *NumberOfEnabledProcessors);
+	unsigned long long (*GetProcessorInfo)(
+		struct EFI_MP_SERVICES_PROTOCOL *This,
+		unsigned long long ProcessorNumber,
+		struct EFI_PROCESSOR_INFORMATION *ProcessorInfoBuffer);
+	unsigned long long (*StartupAllAPs)(
+		struct EFI_MP_SERVICES_PROTOCOL *This,
+		void (*Procedure)(void *ProcedureArgument),
+		unsigned char SingleThread,
+		void *WaitEvent,
+		unsigned long long TimeoutInMicroSeconds,
+		void *ProcedureArgument,
+		unsigned long long **FailedCpuList);
+	unsigned long long (*StartupThisAP)(
+		struct EFI_MP_SERVICES_PROTOCOL *This,
+		void (*Procedure)(void *ProcedureArgument),
+		unsigned long long ProcessorNumber,
+		void *WaitEvent,
+		unsigned long long TimeoutInMicroseconds,
+		void *ProcedureArgument,
+		unsigned char *Finished);
+	unsigned long long (*SwitchBSP)(
+		struct EFI_MP_SERVICES_PROTOCOL *This,
+		unsigned long long ProcessorNumber,
+		unsigned char EnableOldBSP);
+	unsigned long long (*EnableDisableAP)(
+		struct EFI_MP_SERVICES_PROTOCOL *This,
+		unsigned long long ProcessorNumber,
+		unsigned char EnableAP,
+		unsigned int *HealthFlag);
+	unsigned long long (*WhoAmI)(
+		struct EFI_MP_SERVICES_PROTOCOL *This,
+		unsigned long long *ProcessorNumber);
+};
+
+
 struct EFI_GRAPHICS_OUTPUT_PROTOCOL *GOP;
+struct EFI_MP_SERVICES_PROTOCOL *MSP;
 struct EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *SFSP;
 
 

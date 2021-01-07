@@ -1,18 +1,23 @@
 #include "fb.h"
 
 
+#define BG_RED      0
+#define BG_GREEN    255
+#define BG_BLUE     0
+
+
 struct framebuffer fb;
+
+
+struct pixelformat {
+    unsigned char b;
+    unsigned char g;
+    unsigned char r;
+    unsigned char _reserved;
+};
 struct pixelformat color_fg;
 struct pixelformat color_bg;
 
-
-void fb_init(struct framebuffer *_fb)
-{
-    fb.base = _fb->base;
-    fb.size = _fb->size;
-    fb.hr = _fb->hr;
-    fb.vr = _fb->vr;
-}
 
 void set_fg(unsigned char r, unsigned char g, unsigned char b)
 {
@@ -56,4 +61,17 @@ void fill_rect(unsigned int x, unsigned int y,
 void clear_screen(void)
 {
     fill_rect(0, 0, fb.hr, fb.vr, color_bg.r, color_bg.g, color_bg.b);
+}
+
+void fb_init(struct framebuffer *_fb)
+{
+    fb.base = _fb->base;
+    fb.size = _fb->size;
+    fb.hr = _fb->hr;
+    fb.vr = _fb->vr;
+
+    set_fg(255, 255, 255);
+    set_bg(0, 0, 0);
+
+    clear_screen();
 }

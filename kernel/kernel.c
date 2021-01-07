@@ -1,16 +1,22 @@
 #include "fb.h"
-#include "fbcon.h"
-#include "font.h"
+#include "stdio.h"
 
 
-void start_kernel(struct framebuffer *fb)
+struct platform_info {
+	struct framebuffer fb;
+	void *rsdp;
+	unsigned long long nproc;
+};
+
+void start_kernel(struct platform_info *pi)
 {
-    fb_init(fb);
-    set_fg(255, 255, 255);
-    set_bg(0, 0, 0);
-    clear_screen();
+    int i = 0x10;
+ 
+    fb_init(&pi->fb);
 
-    puts("HELLO WORLD!");
+    printf("HELLO WORLD\n");
+    printf("0x%x", i);
+
 
     while (1);
 }

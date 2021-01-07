@@ -2,18 +2,6 @@
 #define _FB_H_
 
 
-#define BG_RED      0
-#define BG_GREEN    255
-#define BG_BLUE     0
-
-
-struct pixelformat {
-    unsigned char b;
-    unsigned char g;
-    unsigned char r;
-    unsigned char _reserved;
-};
-
 struct framebuffer {
     struct pixelformat *base;
     unsigned long long size;
@@ -24,16 +12,8 @@ struct framebuffer {
 extern struct framebuffer fb;
 
 void fb_init(struct framebuffer *_fb);
-void set_fg(unsigned char r, unsigned char g, unsigned char b);
-void set_bg(unsigned char r, unsigned char g, unsigned char b);
-void draw_px(unsigned int x, unsigned int y,
-                    unsigned char r, unsigned char g, unsigned char b);
 void draw_px_fg(unsigned int x, unsigned int y);
-void fill_rect(unsigned int x, unsigned int y,
-                    unsigned int w, unsigned int h,
-                    unsigned char r, unsigned char g, unsigned char b);
 void clear_screen(void);
-
 
 
 

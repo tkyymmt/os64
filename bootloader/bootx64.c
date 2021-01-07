@@ -15,21 +15,23 @@
 
 
 
-struct EFI_GUID fi_guid = {0x09576e92, 0x6d3f, 0x11d2,
-			   {0x8e, 0x39, 0x00, 0xa0,
-			    0xc9, 0x69, 0x72, 0x3b}};
-struct EFI_GUID sfsp_guid = {0x0964e5b22, 0x6459, 0x11d2,
-			     {0x8e, 0x39, 0x00, 0xa0,
-			      0xc9, 0x69, 0x72, 0x3b}};
-
 void efi_init(struct EFI_SYSTEM_TABLE *ST)
 {
 	struct EFI_GUID gop_guid = {0x9042a9de, 0x23dc, 0x4a38,
 				    {0x96, 0xfb, 0x7a, 0xde,
 				     0xd0, 0x80, 0x51, 0x6a}};
+	struct EFI_GUID msp_guid = {0x3fdda605, 0xa76e, 0x4f46,
+				    {0xad, 0x29, 0x12, 0xf4,
+				     0x53, 0x1b, 0x3d, 0x08}};
+
+	struct EFI_GUID sfsp_guid = {0x0964e5b22, 0x6459, 0x11d2,
+					{0x8e, 0x39, 0x00, 0xa0,
+					 0xc9, 0x69, 0x72, 0x3b}};
+
 
 	ST->BootServices->SetWatchdogTimer(0, 0, 0, NULL);
 	ST->BootServices->LocateProtocol(&gop_guid, NULL, (void **)&GOP);
+	ST->BootServices->LocateProtocol(&msp_guid, NULL, (void **)&MSP);
 	ST->BootServices->LocateProtocol(&sfsp_guid, NULL, (void **)&SFSP);
 }
 
@@ -83,13 +85,49 @@ void assert(unsigned long long status, unsigned short *message)
 }
 
 
-struct framebuffer fb;
-void init_fb()
+#define TRUE 1
+#define FALSE 0
+void *find_efi_acpi_table()
 {
-	fb.base = GOP->Mode->FrameBufferBase;
-	fb.size = GOP->Mode->FrameBufferSize;
-	fb.hr = GOP->Mode->Info->HorizontalResolution;
-	fb.vr = GOP->Mode->Info->VerticalResolution;
+	const struct EFI_GUID efi_acpi_table = {0x8868e871, 0xe4f1,0x11d3,
+					{0xbc, 0x22, 0x00, 0x80,
+					 0xc7, 0x3c, 0x88, 0x81}};
+
+	for (int i = 0; i < ST->NumberOfTableEntries; i++) {
+		struct EFI_GUID *guid = &ST->ConfigurationTable[i].VendorGuid;
+		if ((guid->Data1 == efi_acpi_table.Data1)
+		    && (guid->Data2 == efi_acpi_table.Data2)
+		    && (guid->Data3 == efi_acpi_table.Data3)) {
+			unsigned char is_equal = TRUE;
+			for (int j = 0; j < 8; j++) {
+				if (guid->Data4[j] != efi_acpi_table.Data4[j])
+					is_equal = FALSE;
+			}
+			if (is_equal)
+				return ST->ConfigurationTable[i].VendorTable;
+		}
+	}
+	return NULL;
+}
+
+struct platform_info {
+	struct framebuffer fb;
+	void *rsdp;
+	unsigned long long nproc;
+} pi;
+
+void init_pi()
+{
+	pi.fb.base = GOP->Mode->FrameBufferBase;
+	pi.fb.size = GOP->Mode->FrameBufferSize;
+	pi.fb.hr = GOP->Mode->Info->HorizontalResolution;
+	pi.fb.vr = GOP->Mode->Info->VerticalResolution;
+
+	pi.rsdp = find_efi_acpi_table();
+
+	unsigned long long nproc, nproc_en;
+	MSP->GetNumberOfProcessors(MSP, &nproc, &nproc_en);
+	pi.nproc = nproc_en;
 }
 
 
@@ -122,6 +160,10 @@ void load_kernel(/*struct EFI_SYSTEM_TABLE *ST*/)
 	unsigned long long fi_buf[FILE_INFO_BUF_SIZE];
 	struct EFI_FILE_INFO *fi_ptr;
 
+	struct EFI_GUID fi_guid = {0x09576e92, 0x6d3f, 0x11d2,
+				{0x8e, 0x39, 0x00, 0xa0,
+				 0xc9, 0x69, 0x72, 0x3b}};
+
 
 	SFSP->OpenVolume(SFSP, &root);
 	root->Open(root, &kernel_file, KERNEL_FILE_NAME, EFI_FILE_MODE_READ, 0);
@@ -140,10 +182,9 @@ void load_kernel(/*struct EFI_SYSTEM_TABLE *ST*/)
 	
 	kernel_file->Close(kernel_file);
 
-	// This causes a exception in other environment.
-	// my guess is due to the difference of the memory map of qemu
 	ST->BootServices->SetMem(head.bss_start, head.bss_size, 0);
 }
+
 
 /* I don't know, but if you put mem_desc variable into exit_boot_services, 
  * you get error message saying "undefined reference to `___chkstk_ms'".
@@ -168,6 +209,7 @@ void exit_boot_services(void *IH, struct EFI_SYSTEM_TABLE *ST)
     ST->BootServices->ExitBootServices(IH, map_key);
 }
 
+
 void efi_main(void *ImageHandle, struct EFI_SYSTEM_TABLE  *SystemTable)
 {
     void *IH = ImageHandle;
@@ -180,8 +222,8 @@ void efi_main(void *ImageHandle, struct EFI_SYSTEM_TABLE  *SystemTable)
 	ST->ConOut->OutputString(ST->ConOut, L"Initializing the bootloader\n");
     efi_init(ST);
 
-	ST->ConOut->OutputString(ST->ConOut, L"Initializing the framebuffer\n");
-	init_fb();
+	ST->ConOut->OutputString(ST->ConOut, L"Initializing the platform information\n");
+	init_pi();
 
 	ST->ConOut->OutputString(ST->ConOut, L"Loading the kernel\n");
     load_kernel();
@@ -190,14 +232,14 @@ void efi_main(void *ImageHandle, struct EFI_SYSTEM_TABLE  *SystemTable)
     exit_boot_services(IH, ST);
 
 
-	// jump to kernel code
-	unsigned long long kernel_arg_fb = (unsigned long long)&fb;
+	// jump to kernel code with passing kernel_arg
+	unsigned long long kernel_arg = (unsigned long long)&pi;
 	unsigned long long _sb = KERNEL_STACK_BASE;
 	unsigned long long _ks = KERNEL_START;
 	__asm__ (	"	mov	%0, %%rdi\n"
 				"	mov	%1, %%rsp\n"
 				"	jmp	*%2\n"
-				::"m"(kernel_arg_fb), "m"(_sb), "m"(_ks));
+				::"m"(kernel_arg), "m"(_sb), "m"(_ks));
 
 
     while(1);

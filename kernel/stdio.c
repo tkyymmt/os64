@@ -6,27 +6,27 @@
 
 unsigned int cursor_x = 0, cursor_y = 0;
 
+
 void putc(char c)
 {
-	unsigned int x, y;
-
 	switch(c) {
 	case '\r':
 		cursor_x = 0;
 		break;
 
 	case '\n':
+		cursor_x = 0;
 		cursor_y += FONT_HEIGHT;
 		if ((cursor_y + FONT_HEIGHT) >= fb.vr) {
-			cursor_x = cursor_y = 0;
+			cursor_y = 0;
 			clear_screen();
 		}
 		break;
 
 	default:
 		/* カーソル座標(cursor_x,cursor_y)へ文字を描画 */
-		for (y = 0; y < FONT_HEIGHT; y++)
-			for (x = 0; x < FONT_WIDTH; x++)
+		for (int y = 0; y < FONT_HEIGHT; y++)
+			for (int x = 0; x < FONT_WIDTH; x++)
 				if (font_bitmap[(unsigned int)c][y][x])
 					draw_px_fg(cursor_x + x, cursor_y + y);
 

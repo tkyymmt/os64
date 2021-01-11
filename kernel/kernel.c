@@ -10,13 +10,7 @@ struct platform_info {
 
 void start_kernel(struct platform_info *pi)
 {
-    int i = 0x10;
- 
     fb_init(&pi->fb);
-
-    printf("HELLO WORLD\n");
-    printf("0x%x", i);
-
 
     while (1);
 }

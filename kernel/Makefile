@@ -8,5 +8,8 @@ kernel.bin: kernel.o stdio.o fb.o font.o kbc.o
 %.o: %.c
 	gcc $(CFLAGS) -o $@ -c $<
 
+#%.o: %.s
+	#as -o $@ -c $<
+
 clean:
 	rm -rf *.o *.map kernel.bin

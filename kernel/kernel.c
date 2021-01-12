@@ -8,17 +8,19 @@ struct platform_info {
 	unsigned long long nproc;
 };
 
-unsigned short *vram = 0xB8000;
-
 
 void start_kernel(struct platform_info *pi)
 {
     fb_init(&pi->fb);
 
-    while(1) {
-        char ch = getchar();
-        if (('a' <= ch) && (ch <= 'z'))
-            ch = ch - 'a' + 'A';
+/*
+    idt_init();
+    kbc_init();
+*/
+
+    char ch;
+    while (1) {
+        ch = getchar();
         putchar(ch);
     }
 

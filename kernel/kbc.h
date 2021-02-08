@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 
+
 static const uint8_t normal_keymap[256] = {
 	'\0', '\0', '1',  '2',  '3',  '4',  '5',  '6',
 	'7',  '8',  '9',  '0',  '-',  '=',  '\b', '\t',

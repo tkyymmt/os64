@@ -1,7 +1,8 @@
-.global kbc_handler
-.extern do_kbc_irg
+.macro	irq_handler lbl, func
 
-kbc_handler:
+.global	\lbl
+.extern \func
+\lbl:
     push    %rax
     push    %rcx
     push    %rdx
@@ -9,7 +10,9 @@ kbc_handler:
     push    %rbp
     push    %rsi
     push    %rdi
-    call    do_kbc_irg
+
+    call    \func
+    
     pop     %rdi
     pop     %rsi
     pop     %rbp
@@ -17,7 +20,11 @@ kbc_handler:
     pop     %rdx
     pop     %rcx
     pop     %rax
+    
     iretq
+.endm
+
+irq_handler kbc_handler do_kbc_irg
 
 
 .global default_handler
